@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset=utf-8 />
+<title>Parameter trousers</title>
+<script>
+
+
+    var default_max_print_width = 190;
+    var default_max_print_height = 255;
+    var default_extra_fabric = 10;
+    var default_a = 80;
+    var default_b = 40;
+    var default_c = 80; // 82.46211251235322; // Math.sqrt(80*80 + 20*20);
+    var default_d = 40;
+    var default_e = 40;
+
+    var svg_padding = 0.5; // lines directly at the SVG border are not totally visible or malformed
+    var scale_rectangle_size = 100;
+    var print_page_overlap = 10;
+    var print_align_cross_size = 20;
+
+    function r(float) {
+
+        return Math.round(float * 1000) / 1000
+    }
+
+    function get_float(key, default_value) {
+
+        if (localStorage.getItem(key) !== null && !isNaN(parseFloat(localStorage.getItem(key)))) {
+            return parseFloat(localStorage.getItem(key));
+        } else {
+            return parseFloat(default_value);
+        }
+    }
+
+    function set_float(key, value) {
+
+        if (!isNaN(parseFloat(value))) {
+            localStorage.setItem(key, value);
+        } else {
+            console.log('"' + value + '" not stored in localStorage, because it can not be parsed to float!');
+        }
+    }
+
+    function get_trousers_length(a, b, c, d, e, extra_fabric) {
+
+        return Math.sqrt(
+            Math.pow(c, 2) - Math.pow(e / 2 + d / 2 - a / 4, 2)
+        ) + extra_fabric * 2;
+    }
+
+    function get_trousers_width(a, b, c, d, e, extra_fabric) {
+
+        return Math.max(a / 2 + extra_fabric, e / 2 + d + e / 2 + extra_fabric);
+    }
+
+    function create_scale_rectangle_svg_group(size = 100) {
+
+        var group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.setAttribute('class', 'scale_rectangle');
+
+        var rect = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        rect.setAttribute('d',
+            'M 0 0'
+            + ' L ' + r(size) + ' ' + 0
+            + ' L ' + r(size) + ' ' + r(size)
+            + ' L ' + 0 + ' ' + r(size)
+            + ' Z'
+        );
+        group.appendChild(rect);
+
+        var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', r(size / 2));
+        text.setAttribute('y', r(size / 100));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('alignment-baseline', 'hanging');
+        text.setAttribute('transform', 'rotate(0 ' + r(size / 2) + ',' + r(size / 100) + ')');
+        text.textContent = '← ' + size + 'mm →';
+        group.appendChild(text);
+
+        var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', r(size / 100));
+        text.setAttribute('y', r(size / 2));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('alignment-baseline', 'hanging');
+        text.setAttribute('transform', 'rotate(-90 ' + r(size / 100) + ',' + r(size / 2) + ')');
+        text.textContent = '← ' + size + 'mm →';
+        group.appendChild(text);
+
+        var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', r(size / 2));
+        text.setAttribute('y', r(size - size / 100));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('alignment-baseline', 'hanging');
+        text.setAttribute('transform', 'rotate(-180 ' + r(size / 2) + ',' + r(size - size / 100) + ')');
+        text.textContent = '← ' + size + 'mm →';
+        group.appendChild(text);
+
+        var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', r(size - size / 100));
+        text.setAttribute('y', r(size / 2));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('alignment-baseline', 'hanging');
+        text.setAttribute('transform', 'rotate(-270 ' + r(size - size / 100) + ',' + r(size / 2) + ')');
+        text.textContent = '← ' + size + 'mm →';
+        group.appendChild(text);
+
+        return group;
+    }
+
+    function create_print_align_cross_svg_path(size = 10) {
+
+        var cross = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        cross.setAttribute('class', 'align_cross');
+        cross.setAttribute('d',
+            'M ' + r(-size / 2) + ' ' + r(-size / 2)
+            + ' L ' + r(size / 2) + ' ' + r(size / 2)
+            + ' M ' + r(size / 2) + ' ' + r(-size / 2)
+            + ' L ' + r(-size / 2) + ' ' + r(size / 2)
+        );
+
+        return cross;
+    }
+
+    function create_parameter_text_svg(a, b, c, d, e, extra_fabric, max_print_width, max_print_height, note) {
+
+        var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+
+        var tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+        tspan.setAttribute('class', 'parameter');
+        tspan.setAttribute('x', '0');
+        tspan.setAttribute('dy', '1.2em')
+        tspan.textContent = 'a: ' + r(a / 10) + 'cm';
+        text.appendChild(tspan);
+
+        var tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+        tspan.setAttribute('class', 'parameter');
+        tspan.setAttribute('x', '0');
+        tspan.setAttribute('dy', '1.2em')
+        tspan.textContent = 'b: ' + r(b / 10) + 'cm';
+        text.appendChild(tspan);
+
+        var tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+        tspan.setAttribute('class', 'parameter');
+        tspan.setAttribute('x', '0');
+        tspan.setAttribute('dy', '1.2em')
+        tspan.textContent = 'c: ' + r(c / 10) + 'cm';
+        text.appendChild(tspan);
+
+        var tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+        tspan.setAttribute('class', 'parameter');
+        tspan.setAttribute('x', '0');
+        tspan.setAttribute('dy', '1.2em')
+        tspan.textContent = 'd: ' + r(d / 10) + 'cm';
+        text.appendChild(tspan);
+
+        var tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+        tspan.setAttribute('class', 'parameter');
+        tspan.setAttribute('x', '0');
+        tspan.setAttribute('dy', '1.2em')
+        tspan.textContent = 'e: ' + r(e / 10) + 'cm';
+        text.appendChild(tspan);
+
+        var tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+        tspan.setAttribute('class', 'parameter');
+        tspan.setAttribute('x', '0');
+        tspan.setAttribute('dy', '1.2em')
+        tspan.textContent = 'extra fabric: ' + r(extra_fabric / 10) + 'cm';
+        text.appendChild(tspan);
+
+        var tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+        tspan.setAttribute('class', 'parameter');
+        tspan.setAttribute('x', '0');
+        tspan.setAttribute('dy', '1.2em')
+        tspan.textContent = 'max print width: ' + r(max_print_width / 10) + 'cm';
+        text.appendChild(tspan);
+
+        var tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+        tspan.setAttribute('class', 'parameter');
+        tspan.setAttribute('x', '0');
+        tspan.setAttribute('dy', '1.2em')
+        tspan.textContent = 'max print height: ' + r(max_print_height / 10) + 'cm';
+        text.appendChild(tspan);
+
+        var tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+        tspan.setAttribute('class', 'parameter');
+        tspan.setAttribute('x', '0');
+        tspan.setAttribute('dy', '1.2em')
+        tspan.textContent = 'max print height: ' + r(max_print_height / 10) + 'cm';
+        text.appendChild(tspan);
+
+        if (note) {
+            var tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+            tspan.setAttribute('class', 'parameter');
+            tspan.setAttribute('x', '0');
+            tspan.setAttribute('dy', '2.4em')
+            tspan.textContent = note;
+            text.appendChild(tspan);
+        }
+
+        return text;
+    }
+
+    function create_half_trousers_svg_path(a, b, c, d, e, extra_fabric = 0) {
+
+        var trousers_length = get_trousers_length(a, b, c, d, e, extra_fabric);
+        var trousers_half_width = get_trousers_width(a, b, c, d, e, 0) / 2 + extra_fabric;
+
+        var p1x = 0;
+        var p1y = 0;
+        var p2x = a / 4;
+        var p2y = 0;
+        var p3x = a / 4 + extra_fabric;
+        var p3y = extra_fabric;
+        var p4x = d / 2 + e / 2 + extra_fabric;
+        var p4y = trousers_length - extra_fabric;
+        var p4a = (p4x - p2x) / 3 * 2 + p2x;
+        var p4b = p4y - (p4y - p2y) / 3 * 2;
+        var p5x = d / 2 + e / 2;
+        var p5y = trousers_length;
+        var p6x = d / 2;
+        var p6y = trousers_length;
+        var p7x = d / 2 - extra_fabric;
+        var p7y = trousers_length - extra_fabric;
+        var p8x = 0;
+        var p8y = b + extra_fabric * 2;
+        var p8a = p8x + (p7x - p8x) / 4 * 3;
+        var p8b = p8y;
+
+        var half_trousers = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        half_trousers.setAttribute('d',
+            'M ' + r(p1x) + ' ' + r(p1y)
+            + ' L ' + r(p2x) + ' ' + r(p2y)
+            + ' L ' + r(p3x) + ' ' + r(p3y)
+            + ' Q ' + r(p4a) + ' ' + r(p4b) + ' ' + r(p4x) + ' ' + r(p4y)
+            + ' L ' + r(p5x) + ' ' + r(p5y)
+            + ' L ' + r(p6x) + ' ' + r(p6y)
+            + ' L ' + r(p7x) + ' ' + r(p7y)
+            + ' Q ' + r(p8a) + ' ' + r(p8b) + ' ' + r(p8x) + ' ' + r(p8y)
+            + ' Z'
+        );
+
+        return half_trousers;
+    }
+
+    function create_trouser_legend_svg_group(a, b, c, d, e, extra_fabric = 0) {
+
+        var trousers_length = get_trousers_length(a, b, c, d, e, extra_fabric);
+        var trousers_width = get_trousers_width(a, b, c, d, e, extra_fabric);
+        var trousers_half_width = trousers_width / 2;
+        var unit = Math.min(trousers_length, trousers_width) / 80;
+
+        var group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.setAttribute('class', 'legend');
+
+        var dim = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        dim.setAttribute('id', 'dim_a');
+        dim.setAttribute('d',
+            'M ' + r(trousers_half_width - a / 4 + unit) + ' ' + r(unit * 4)
+            + ' C ' + r(trousers_half_width - a / 4 + unit) + ' ' + r(unit) + ' ' + r(trousers_half_width + a / 4 - unit) + ' ' + r(unit) + ' ' + r(trousers_half_width + a / 4 - unit) + ' ' + r(unit * 4)
+            + ' C ' + r(trousers_half_width + a / 4 + unit) + ' ' + r(unit * 7) + ' ' + r(trousers_half_width - a / 4 + unit) + ' ' + r(unit * 7) + ' ' + r(trousers_half_width - a / 4 + unit) + ' ' + r(unit * 4)
+            + ' M ' + r(trousers_half_width - a / 4 + unit) + ' ' + r(unit)
+            + ' L ' + r(trousers_half_width - a / 4 + unit) + ' ' + r(unit * 7)
+            + ' M ' + r(trousers_half_width + a / 4 - unit) + ' ' + r(unit)
+            + ' L ' + r(trousers_half_width + a / 4 - unit) + ' ' + r(unit * 7)
+        );
+        group.appendChild(dim);
+
+        var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('id', 'text_a');
+        text.setAttribute('x', r(trousers_half_width + a / 4 - unit));
+        text.setAttribute('y', r(unit * 5));
+        text.setAttribute('text-anchor', 'end');
+        text.setAttribute('alignment-baseline', 'hanging');
+        text.textContent = 'a';
+        group.appendChild(text);
+
+        var dim = document.createElementNS('http://www.w3.org/2000/svg', 'path');0
+        dim.setAttribute('id', 'dim_b');
+        dim.setAttribute('d',
+            'M ' + r(trousers_half_width) + ' ' + r(unit * 2)
+            + ' L ' + r(trousers_half_width) + ' ' + r(b - unit * 2)
+            + ' M ' + r(trousers_half_width - unit * 3) + ' ' + r(unit * 2)
+            + ' L ' + r(trousers_half_width + unit * 3) + ' ' + r(unit * 2)
+            + ' M ' + r(trousers_half_width - unit * 3) + ' ' + r(b - unit * 2)
+            + ' L ' + r(trousers_half_width + unit * 3) + ' ' + r(b - unit * 2)
+        );
+        group.appendChild(dim);
+
+        var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('id', 'text_b');
+        text.setAttribute('x', r(trousers_half_width + unit));
+        text.setAttribute('y', r(b + unit - 5));
+        text.setAttribute('text-anchor', 'start');
+        text.setAttribute('alignment-baseline', 'baseline');
+        text.textContent = 'b';
+        group.appendChild(text);
+
+        var dim = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        dim.setAttribute('id', 'dim_c');
+        dim.setAttribute('d',
+            'M ' + r(trousers_half_width - a / 4) + ' ' + r(unit * 2)
+            + ' L ' + r(trousers_half_width - d / 2 - e / 2 + unit * 2) + ' ' + r(trousers_length - unit * 2)
+            + ' M ' + r(trousers_half_width - a / 4 - unit * 3) + ' ' + r(unit * 2)
+            + ' L ' + r(trousers_half_width - a / 4 + unit * 3) + ' ' + r(unit * 2)
+            + ' M ' + r(trousers_half_width - d / 2 - e / 2 - unit) + ' ' + r(trousers_length - unit * 2)
+            + ' L ' + r(trousers_half_width - d / 2 - e / 2 + unit * 5) + ' ' + r(trousers_length - unit * 2)
+        );
+        group.appendChild(dim);
+
+        var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('id', 'text_c');
+        text.setAttribute('x', r((trousers_half_width - d / 2 - e / 2 + trousers_half_width - a / 4) / 2 + unit * 2));
+        text.setAttribute('y', r(trousers_length / 2));
+        text.setAttribute('text-anchor', 'start');
+        text.setAttribute('alignment-baseline', 'middle');
+        text.textContent = 'c';
+        group.appendChild(text);
+
+        var dim = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        dim.setAttribute('id', 'dim_d');
+        dim.setAttribute('d',
+            'M ' + r(trousers_half_width - d / 2 + unit * 2) + ' ' + r(trousers_length - unit * 4)
+            + ' L ' + r(trousers_half_width + d / 2 - unit * 2) + ' ' + r(trousers_length - unit * 4)
+            + ' M ' + r(trousers_half_width - d / 2 + unit * 2) + ' ' + r(trousers_length - unit * 7)
+            + ' L ' + r(trousers_half_width - d / 2 + unit * 2) + ' ' + r(trousers_length - unit)
+            + ' M ' + r(trousers_half_width + d / 2 - unit * 2) + ' ' + r(trousers_length - unit * 7)
+            + ' L ' + r(trousers_half_width + d / 2 - unit * 2) + ' ' + r(trousers_length - unit)
+        );
+        group.appendChild(dim);
+
+        var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('id', 'text_d');
+        text.setAttribute('x', r(trousers_half_width));
+        text.setAttribute('y', r(trousers_length - unit * 6));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('alignment-baseline', 'baseline');
+        text.textContent = 'd';
+        group.appendChild(text);
+
+        var dim = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        dim.setAttribute('id', 'dim_e');
+        dim.setAttribute('d',
+            'M ' + r(trousers_half_width + d / 2 + unit * 2) + ' ' + r(trousers_length - unit * 4)
+            + ' C ' + r(trousers_half_width + d / 2 + unit * 2) + ' ' + r(trousers_length - unit * 7) + ' ' + r(trousers_half_width + d / 2 + e / 2 - unit * 2) + ' ' + r(trousers_length - unit * 7) + ' ' + r(trousers_half_width + d / 2 + e / 2 - unit * 2) + ' ' + r(trousers_length - unit * 4)
+            + ' C ' + r(trousers_half_width + d / 2 + e / 2 - unit * 2) + ' ' + r(trousers_length - unit) + ' ' + r(trousers_half_width + d / 2 + unit * 2) + ' ' + r(trousers_length - unit) + ' ' + r(trousers_half_width + d / 2 + unit * 2) + ' ' + r(trousers_length - unit * 4)
+            + ' M ' + r(trousers_half_width + d / 2 + unit * 2) + ' ' + r(trousers_length - unit * 7)
+            + ' L ' + r(trousers_half_width + d / 2 + unit * 2) + ' ' + r(trousers_length - unit)
+            + ' M ' + r(trousers_half_width + d / 2 + e / 2 - unit * 2) + ' ' + r(trousers_length - unit * 7)
+            + ' L ' + r(trousers_half_width + d / 2 + e / 2 - unit * 2) + ' ' + r(trousers_length - unit)
+        );
+        group.appendChild(dim);
+
+        var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('id', 'text_e');
+        text.setAttribute('x', r(trousers_half_width + d / 2 + e / 4));
+        text.setAttribute('y', r(trousers_length - unit * 8));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('alignment-baseline', 'baseline');
+        text.textContent = 'e';
+        group.appendChild(text);
+
+        return group;
+    }
+
+    function create_print_view() {
+
+        var input_a = document.getElementById('input_a').value;
+        var input_b = document.getElementById('input_b').value;
+        var input_c = document.getElementById('input_c').value;
+        var input_d = document.getElementById('input_d').value;
+        var input_e = document.getElementById('input_e').value;
+        var input_note = document.getElementById('input_note').value;
+        var input_extra_fabric = document.getElementById('input_extra_fabric').value;
+        var input_max_print_width = document.getElementById('input_max_print_width').value;
+        var input_max_print_height = document.getElementById('input_max_print_height').value;
+
+        if (input_a > 0) {
+            a = input_a * 10;
+            set_float('a', a);
+        }
+        if (input_c > 0) {
+            c = input_c * 10;
+            set_float('c', c);
+        }
+        if (input_d > 0) {
+            d = input_d * 10;
+            set_float('d', d);
+        }
+        if (input_e > 0) {
+            e = input_e * 10;
+            set_float('e', e);
+        }
+        if (input_b > 0 && input_b <= get_trousers_length(a, input_b, c, d, e, 0)) {
+            b = input_b * 10;
+            set_float('b', b);
+        }
+        if (input_extra_fabric >= 0) {
+            extra_fabric = input_extra_fabric * 10;
+            set_float('extra_fabric', extra_fabric);
+        }
+        if (input_max_print_width >= 0) {
+            max_print_width = input_max_print_width * 10;
+            set_float('max_print_width', max_print_width);
+        }
+        if (input_max_print_height >= 0) {
+            max_print_height = input_max_print_height * 10;
+            set_float('max_print_height', max_print_height);
+        }
+        note = input_note;
+        localStorage.setItem('note', input_note);
+
+        // remove everything from body
+        while (document.body.children[0]) {
+            document.body.children[0].remove();
+        }
+
+        // add svg
+        var trousers_width = r(get_trousers_width(a, b, c, d, e, extra_fabric));
+        var trousers_length = r(get_trousers_length(a, b, c, d, e, extra_fabric));
+
+        var x_pages = Math.ceil((trousers_width / 2 + svg_padding * 2) / (max_print_width - print_page_overlap));
+        var y_pages = Math.ceil((trousers_length + svg_padding * 2) / (max_print_height - print_page_overlap));
+
+        for (var y_page = 0; y_page < y_pages; y_page++) {
+
+            for (var x_page = 0; x_page < x_pages; x_page++) {
+
+                var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('width', max_print_width + 'mm');
+                svg.setAttribute('height', max_print_height  + 'mm');
+                svg.setAttribute('viewBox', r((max_print_width - print_page_overlap) * x_page) + ' ' + r((max_print_height - print_page_overlap) * y_page) + ' ' + max_print_width  + ' ' + max_print_height );
+                document.body.appendChild(svg);
+
+                // add half trousers
+                var half_trousers = create_half_trousers_svg_path(a, b, c, d, e, 0);
+                half_trousers.setAttribute('transform', 'translate(' + svg_padding  + ' ' + (svg_padding + extra_fabric)  + ')');
+                half_trousers.setAttribute('class', 'print');
+                svg.appendChild(half_trousers);
+
+                // add half trousers with extra fabric
+                if (extra_fabric > 0) {
+                    var extra_fabric_half_trousers = create_half_trousers_svg_path(a, b, c, d, e, extra_fabric);
+                    extra_fabric_half_trousers.setAttribute('transform', 'translate(' + svg_padding  + ' ' + svg_padding  + ')');
+                    extra_fabric_half_trousers.setAttribute('class', 'extra_fabric');
+                    svg.appendChild(extra_fabric_half_trousers);
+                }
+
+                // add marks to allow scaling, aligning and cutting pages
+                var marks = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                marks.setAttribute('class', 'marks');
+                svg.appendChild(marks);
+
+                // marks that are only on the first page
+                if (x_page == 0 && y_page == 0) {
+
+                    // add 100mm rectangle
+                    var scale_rectangle = create_scale_rectangle_svg_group(scale_rectangle_size)
+                    scale_rectangle.setAttribute('transform', 'translate( ' + r(5 + svg_padding) + ' ' + r(5 + svg_padding + extra_fabric) + ')');
+                    marks.appendChild(scale_rectangle);
+
+                    // add parameters as text
+                    var text = create_parameter_text_svg(a, b, c, d, e, extra_fabric, max_print_width, max_print_height, note);
+                    text.setAttribute('transform', 'translate(' + r(svg_padding + 20) + ' ' + r(svg_padding + extra_fabric + 20) + ')');
+                    marks.appendChild(text);
+                }
+
+                // add top left aligning crosses
+                if (x_page > 0 || y_page > 0) {
+                    var cross = create_print_align_cross_svg_path(print_align_cross_size);
+                    cross.setAttribute('transform', 'translate(' + r((max_print_width - print_page_overlap) * x_page + print_page_overlap / 2) + ' ' + r((max_print_height - print_page_overlap) * y_page + print_page_overlap / 2) + ')');
+                    marks.appendChild(cross);
+                }
+
+                // add top right aligning crosses
+                if (x_page < x_pages - 1 || y_page > 0) {
+                    var cross = create_print_align_cross_svg_path(print_align_cross_size);
+                    cross.setAttribute('transform', 'translate(' + r((max_print_width - print_page_overlap) * x_page + max_print_width - print_page_overlap / 2) + ' ' + r((max_print_height - print_page_overlap) * y_page + print_page_overlap / 2) + ')');
+                    marks.appendChild(cross);
+                }
+
+                // add bottom left aligning crosses
+                if (x_page > 0 || y_page < y_pages - 1) {
+                    var cross = create_print_align_cross_svg_path(print_align_cross_size);
+                    cross.setAttribute('transform', 'translate(' + r((max_print_width - print_page_overlap) * x_page + print_page_overlap / 2) + ' ' + r((max_print_height - print_page_overlap) * y_page + max_print_height - print_page_overlap / 2) + ')');
+                    marks.appendChild(cross);
+                }
+
+                // add bottom right aligning crosses
+                if (x_page < x_pages - 1 || y_page < y_pages - 1) {
+                    var cross = create_print_align_cross_svg_path(print_align_cross_size);
+                    cross.setAttribute('transform', 'translate(' + r((max_print_width - print_page_overlap) * x_page + max_print_width - print_page_overlap / 2) + ' ' + r((max_print_height - print_page_overlap) * y_page + max_print_height - print_page_overlap / 2) + ')');
+                    marks.appendChild(cross);
+                }
+
+                // add top horizontal cut lines
+                if (y_page > 0) {
+                    var cut_line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    cut_line.setAttribute('class', 'cut_line');
+                    cut_line.setAttribute('d',
+                        'M ' + r((max_print_width - print_page_overlap) * x_page + print_page_overlap / 2) + ' ' + r((max_print_height - print_page_overlap) * y_page + print_page_overlap / 2)
+                        + ' L ' + r((max_print_width - print_page_overlap) * x_page + max_print_width - print_page_overlap / 2) + ' ' + r((max_print_height - print_page_overlap) * y_page + print_page_overlap / 2)
+                    );
+                    marks.appendChild(cut_line);
+                }
+
+                // add bottom horizontal cut lines
+                if (y_page < y_pages - 1) {
+                    var cut_line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    cut_line.setAttribute('class', 'cut_line');
+                    cut_line.setAttribute('d',
+                        'M ' + r((max_print_width - print_page_overlap) * x_page + print_page_overlap / 2) + ' ' + r((max_print_height - print_page_overlap) * y_page + max_print_height - print_page_overlap / 2)
+                        + ' L ' + r((max_print_width - print_page_overlap) * x_page + max_print_width - print_page_overlap / 2) + ' ' + r((max_print_height - print_page_overlap) * y_page + max_print_height - print_page_overlap / 2)
+                    );
+                    marks.appendChild(cut_line);
+                }
+
+                // add left vertical cut lines
+                if (x_page > 0) {
+                    var cut_line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    cut_line.setAttribute('class', 'cut_line');
+                    cut_line.setAttribute('d',
+                        'M ' + r((max_print_width - print_page_overlap) * x_page + print_page_overlap / 2) + ' ' + r((max_print_height - print_page_overlap) * y_page + print_page_overlap / 2)
+                        + ' L ' + r((max_print_width - print_page_overlap) * x_page + print_page_overlap / 2) + ' ' + r((max_print_height - print_page_overlap) * y_page + max_print_height - print_page_overlap / 2)
+                    );
+                    marks.appendChild(cut_line);
+                }
+
+                // add right vertical cut lines
+                if (x_page < x_pages - 1) {
+                    var cut_line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    cut_line.setAttribute('class', 'cut_line');
+                    cut_line.setAttribute('d',
+                        'M ' + r((max_print_width - print_page_overlap) * x_page + max_print_width - print_page_overlap / 2) + ' ' + r((max_print_height - print_page_overlap) * y_page + print_page_overlap / 2)
+                        + ' L ' + r((max_print_width - print_page_overlap) * x_page + max_print_width - print_page_overlap / 2) + ' ' + r((max_print_height - print_page_overlap) * y_page + max_print_height - print_page_overlap / 2)
+                    );
+                    marks.appendChild(cut_line);
+                }
+
+                // add page numbers on the page sides overlap parts
+                for (var y = 0; y < y_pages; y++) {
+                    for (var x = 1; x < x_pages; x++) {
+                        var page_nr = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        page_nr.setAttribute('class', 'page_nr');
+                        page_nr.setAttribute('text-anchor', 'middle');
+                        page_nr.setAttribute('alignment-baseline', 'bottom');
+                        page_nr.setAttribute('transform', 'translate(' + r((max_print_width - print_page_overlap) * x + print_page_overlap / 2) + ' ' + r((max_print_height - print_page_overlap) * y + (max_print_height - print_page_overlap) / 2 - 2) + ')');
+                        page_nr.textContent = x;
+                        marks.appendChild(page_nr)
+
+                        var page_nr = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        page_nr.setAttribute('class', 'page_nr');
+                        page_nr.setAttribute('text-anchor', 'middle');
+                        page_nr.setAttribute('alignment-baseline', 'hanging');
+                        page_nr.setAttribute('transform', 'translate(' + r((max_print_width - print_page_overlap) * x + print_page_overlap / 2) + ' ' + r((max_print_height - print_page_overlap) * y + (max_print_height - print_page_overlap) / 2 + 2) + ')');
+                        page_nr.textContent = y;
+                        marks.appendChild(page_nr)
+                    }
+                }
+                for (var y = 1; y < y_pages; y++) {
+                    for (var x = 0; x < x_pages; x++) {
+                        var page_nr = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        page_nr.setAttribute('class', 'page_nr');
+                        page_nr.setAttribute('text-anchor', 'middle');
+                        page_nr.setAttribute('alignment-baseline', 'middle');
+                        page_nr.setAttribute('transform', 'translate(' + r((max_print_width - print_page_overlap) * x + (max_print_width - print_page_overlap) / 2) + ' ' + r((max_print_height - print_page_overlap) * y + print_page_overlap / 2) + ')');
+                        page_nr.textContent = x + ' ' + y;
+                        marks.appendChild(page_nr)
+                    }
+                }
+            }
+        }
+
+        // add button
+        var button = document.createElement('button');
+        button.setAttribute('class', 'back_button');
+        button.setAttribute('onclick', 'create_configure_view()');
+        button.appendChild(document.createTextNode('Back'));
+        document.body.appendChild(button);
+    }
+
+    function create_configure_view() {
+
+        var max_print_width = get_float('max_print_width', default_max_print_width);
+        var max_print_height = get_float('max_print_height', default_max_print_height);
+        var extra_fabric = get_float('extra_fabric', default_extra_fabric);
+        var a = get_float('a', default_a);
+        var b = get_float('b', default_b);
+        var c = get_float('c', default_c);
+        var d = get_float('d', default_d);
+        var e = get_float('e', default_e);
+        var e = get_float('e', default_e);
+        var note = '';
+        if (localStorage.getItem('note') !== null) {
+            note =  localStorage.getItem('note');
+        }
+
+        // remove everything from body
+        while (document.body.children[0]) {
+            document.body.children[0].remove();
+        }
+
+        var trousers_width = r(get_trousers_width(default_a, default_b, default_c, default_d, default_e, 0));
+        var svg_height = r(svg_padding + trousers_width + svg_padding);
+        var svg_width = r(svg_padding + trousers_width + svg_padding);
+
+        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('height', svg_height + 'mm');
+        svg.setAttribute('width', svg_width + 'mm');
+        svg.setAttribute('viewBox', '0 0 ' + svg_width + ' ' + svg_height);
+        document.body.appendChild(svg);
+
+        var left_half_trousers = create_half_trousers_svg_path(default_a, default_b, default_c, default_d, default_e);
+        left_half_trousers.setAttribute('transform', 'translate(' + r(svg_padding + trousers_width / 2) + ' ' + svg_padding + ') scale(-1 1)');
+        left_half_trousers.setAttribute('class', 'config');
+        svg.appendChild(left_half_trousers);
+
+        var right_half_trousers = create_half_trousers_svg_path(default_a, default_b, default_c, default_d, default_e);
+        right_half_trousers.setAttribute('transform', 'translate(' + r(svg_padding + trousers_width / 2) + ' ' + svg_padding + ')');
+        right_half_trousers.setAttribute('class', 'config');
+        svg.appendChild(right_half_trousers);
+
+        var trouser_legend = create_trouser_legend_svg_group(default_a, default_b, default_c, default_d, default_e);
+        trouser_legend.setAttribute('transform', 'translate(' + svg_padding + ' ' + svg_padding + ')');
+        svg.appendChild(trouser_legend);
+
+        var input_div = document.createElement('div');
+        input_div.setAttribute('action', '#');
+        document.body.appendChild(input_div);
+
+        var div = document.createElement('div');
+        input_div.appendChild(div);
+        div.setAttribute('id', 'div_a');
+        div.appendChild(document.createTextNode('a: '));
+        var input = document.createElement('input');
+        input.setAttribute('id', 'input_a');
+        input.setAttribute('type', 'number');
+        input.setAttribute('min', '0');
+        input.setAttribute('step', '0.5');
+        input.setAttribute('value', a / 10);
+        input.setAttribute('required', '');
+        div.appendChild(input);
+        div.appendChild(document.createTextNode('cm'));
+
+        var div = document.createElement('div');
+        input_div.appendChild(div);
+        div.setAttribute('id', 'div_b');
+        div.appendChild(document.createTextNode('b: '));
+        var input = document.createElement('input');
+        input.setAttribute('id', 'input_b');
+        input.setAttribute('type', 'number');
+        input.setAttribute('min', '0');
+        input.setAttribute('step', '0.5');
+        input.setAttribute('value', b / 10);
+        input.setAttribute('required', '');
+        div.appendChild(input);
+        div.appendChild(document.createTextNode('cm'));
+
+        var div = document.createElement('div');
+        input_div.appendChild(div);
+        div.setAttribute('id', 'div_c');
+        div.appendChild(document.createTextNode('c: '));
+        var input = document.createElement('input');
+        input.setAttribute('id', 'input_c');
+        input.setAttribute('type', 'number');
+        input.setAttribute('min', '0');
+        input.setAttribute('step', '0.5');
+        input.setAttribute('value', c / 10);
+        input.setAttribute('required', '');
+        div.appendChild(input);
+        div.appendChild(document.createTextNode('cm'));
+
+        var div = document.createElement('div');
+        input_div.appendChild(div);
+        div.setAttribute('id', 'div_d');
+        div.appendChild(document.createTextNode('d: '));
+        var input = document.createElement('input');
+        input.setAttribute('id', 'input_d');
+        input.setAttribute('type', 'number');
+        input.setAttribute('min', '0');
+        input.setAttribute('step', '0.5');
+        input.setAttribute('value', d / 10);
+        input.setAttribute('required', '');
+        div.appendChild(input);
+        div.appendChild(document.createTextNode('cm'));
+
+        var div = document.createElement('div');
+        input_div.appendChild(div);
+        div.setAttribute('id', 'div_e');
+        div.appendChild(document.createTextNode('e: '));
+        var input = document.createElement('input');
+        input.setAttribute('id', 'input_e');
+        input.setAttribute('type', 'number');
+        input.setAttribute('min', '0');
+        input.setAttribute('step', '0.5');
+        input.setAttribute('value', e / 10);
+        input.setAttribute('required', '');
+        div.appendChild(input);
+        div.appendChild(document.createTextNode('cm'));
+
+        var div = document.createElement('div');
+        input_div.appendChild(div);
+        div.setAttribute('id', 'div_note');
+        div.appendChild(document.createTextNode('Note: '));
+        var input = document.createElement('input');
+        input.setAttribute('id', 'input_note');
+        input.setAttribute('type', 'text');
+        input.setAttribute('value', note);
+        div.appendChild(input);
+
+        var div = document.createElement('div');
+        input_div.appendChild(div);
+        div.setAttribute('id', 'div_extra_fabric');
+        div.appendChild(document.createTextNode('Extra fabric: '));
+        var input = document.createElement('input');
+        input.setAttribute('id', 'input_extra_fabric');
+        input.setAttribute('type', 'number');
+        input.setAttribute('min', '0');
+        input.setAttribute('step', '0.5');
+        input.setAttribute('value', extra_fabric / 10);
+        input.setAttribute('required', '');
+        div.appendChild(input);
+        div.appendChild(document.createTextNode('cm'));
+
+        var div = document.createElement('div');
+        input_div.appendChild(div);
+        div.setAttribute('id', 'div_max_print_width');
+        div.appendChild(document.createTextNode('Maximum width the printer can print on a page (if scaling is wrong, check this setting): '));
+        var input = document.createElement('input');
+        input.setAttribute('id', 'input_max_print_width');
+        input.setAttribute('type', 'number');
+        input.setAttribute('min', '0');
+        input.setAttribute('step', '0.5');
+        input.setAttribute('value', max_print_width / 10);
+        input.setAttribute('required', '');
+        div.appendChild(input);
+        div.appendChild(document.createTextNode('cm'));
+
+        var div = document.createElement('div');
+        input_div.appendChild(div);
+        div.setAttribute('id', 'div_max_print_height');
+        div.appendChild(document.createTextNode('Maximum height the printer can print on a page (aligment crosses are not in the pages corners, check this setting): '));
+        var input = document.createElement('input');
+        input.setAttribute('id', 'input_max_print_height');
+        input.setAttribute('type', 'number');
+        input.setAttribute('min', '0');
+        input.setAttribute('step', '0.5');
+        input.setAttribute('value', max_print_height / 10);
+        input.setAttribute('required', '');
+        div.appendChild(input);
+        div.appendChild(document.createTextNode('cm'));
+
+        var button = document.createElement('button');
+        input_div.appendChild(button);
+        button.setAttribute('onclick', 'create_print_view()');
+        button.appendChild(document.createTextNode('Create print'));
+    }
+
+    window.onload = function() {
+        create_configure_view();
+    }
+
+</script>
+<style>
+
+    @media print {
+        body,
+        svg {
+            padding: 0px;
+            margin: 0px;
+        }
+
+        svg {
+            page-break-after: always;
+        }
+
+        button {
+            display: none;
+        }
+    }
+
+    div,
+    input,
+    button {
+        font-family: sans-serif;
+        font-size: 16pt;
+    }
+
+    input {
+        border: 0;
+        width: 100pt;
+        text-align: right;
+    }
+
+    #div_extra_fabric,
+    #input_extra_fabric,
+    #div_max_print_width,
+    #input_max_print_width,
+    #div_max_print_height,
+    #input_max_print_height {
+        font-size: 8pt;
+    }
+
+    #input_extra_fabric,
+    #input_max_print_width,
+    #input_max_print_height {
+        width: 20pt;
+    }
+
+    svg path.print {
+        stroke: black;
+        stroke-width: 0.3;
+        fill: transparent;
+    }
+
+    svg path.extra_fabric,
+    svg g.marks g.scale_rectangle path,
+    svg g.marks path.cut_line {
+        stroke: black;
+        stroke-width: 0.2;
+        stroke-dasharray: 3;
+        fill: transparent;
+    }
+
+    svg g.marks path.align_cross {
+        stroke: black;
+        stroke-width: 0.2;
+        stroke-dasharray: 0.5;
+        fill: transparent;
+    }
+
+    svg g.marks tspan.parameter {
+        stroke: transparent;
+        fill: black;
+        font-family: sans-serif;
+        font-size: 4pt;
+    }
+
+    svg g.marks text.page_nr {
+        stroke: transparent;
+        fill: black;
+        font-family: serif;
+        font-size: 8pt;
+    }
+
+    svg g.marks g.scale_rectangle text {
+        stroke: transparent;
+        fill: black;
+        font-family: sans-serif;
+        font-size: 2pt;
+    }
+
+    svg path.config {
+        stroke: black;
+        stroke-width: 0.5;
+        fill: lightyellow;
+    }
+
+    svg g.legend {
+        stroke-width: 0.75;
+        fill: transparent;
+        font-family: sans-serif;
+        font-size: 6pt;
+    }
+
+    button.back_button {
+        position: fixed;
+        top: 10pt;
+        left: 10pt;
+    }
+
+    /* Colors */
+    #div_a,
+    #input_a {
+        color: red;
+    }
+    svg g.legend #dim_a {
+        stroke: red;
+    }
+    svg g.legend #text_a {
+        fill: red;
+    }
+
+    #div_b,
+    #input_b {
+        color: blue;
+    }
+    svg g.legend #dim_b {
+        stroke: blue;
+    }
+    svg g.legend #text_b {
+        fill: blue;
+    }
+
+    #div_c,
+    #input_c {
+        color: green;
+    }
+    svg g.legend #dim_c {
+        stroke: green;
+    }
+    svg g.legend #text_c {
+        fill: green;
+    }
+
+    #div_d,
+    #input_d {
+        color: violet;
+    }
+    svg g.legend #dim_d {
+        stroke: violet;
+    }
+    svg g.legend #text_d {
+        fill: violet;
+    }
+
+    #div_e,
+    #input_e {
+        color: orange;
+    }
+    svg g.legend #dim_e {
+        stroke: orange;
+    }
+    svg g.legend #text_e {
+        fill: orange;
+    }
+
+
+</style>
+</head>
+<body>
+<p>Javascript is needed!</p>
+</body>
+</html>
