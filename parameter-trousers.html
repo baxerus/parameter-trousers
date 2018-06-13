@@ -183,13 +183,6 @@
         tspan.textContent = 'max print height: ' + r(max_print_height / 10) + 'cm';
         text.appendChild(tspan);
 
-        var tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
-        tspan.setAttribute('class', 'parameter');
-        tspan.setAttribute('x', '0');
-        tspan.setAttribute('dy', '1.2em')
-        tspan.textContent = 'max print height: ' + r(max_print_height / 10) + 'cm';
-        text.appendChild(tspan);
-
         if (note) {
             var tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
             tspan.setAttribute('class', 'parameter');
